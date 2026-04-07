@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en" class="dark" style="color-scheme: dark;">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HotMakes HotLinks</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- PapaParse for CSV parsing -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        body { 
+            font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; 
+        }
+        .fade-in { 
+            animation: fadeIn 0.4s ease-out; 
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        /* Custom Dark Mode Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #09090b; } /* zinc-950 */
+        ::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 4px; } /* zinc-700 */
+        ::-webkit-scrollbar-thumb:hover { background: #ea580c; } /* orange-600 */
+    </style>
+</head>
+<body class="min-h-screen text-gray-100 bg-zinc-950 pb-12 selection:bg-orange-500 selection:text-white">
+
+    <!-- Header (Maintains the HotMakes Fiery Branding) -->
+    <header class="bg-gradient-to-r from-orange-600 to-red-600 shadow-lg text-white pt-10 pb-8 px-4 mb-8 sticky top-0 z-40 border-b border-red-700">
+        <div class="max-w-4xl mx-auto">
+            <h1 class="text-4xl md:text-5xl font-extrabold text-center tracking-tight mb-2 drop-shadow-md">
+                <i class="fas fa-fire-flame-curved mr-2"></i> HotMakes HotLinks
+            </h1>
+            <p class="text-center text-orange-100 text-lg mb-8 font-medium drop-shadow-sm">The Complete Episode Link Dump</p>
+            
+            <!-- Search Bar (Dark Mode Adapted) -->
+            <div class="relative max-w-2xl mx-auto shadow-2xl rounded-full">
+                <div class="absolute inset-y-0 left-0 flex items-center pl-5 pointer-events-none">
+                    <i class="fas fa-search text-gray-400"></i>
+                </div>
+                <input type="search" id="searchInput" class="block w-full p-4 pl-12 text-gray-100 border border-zinc-700/50 rounded-full bg-zinc-900/90 backdrop-blur focus:ring-2 focus:ring-orange-400 focus:border-transparent focus:outline-none transition-all text-lg placeholder-gray-400 shadow-inner" placeholder="Search makes, links, or creators...">
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-4xl mx-auto px-4 relative z-10">
+        <!-- Glowing Loading Indicator -->
+        <div id="loading" class="text-center py-20">
+            <i class="fas fa-circle-notch fa-spin text-5xl text-orange-500 mb-4 drop-shadow-[0_0_15px_rgba(249,115,22,0.6)]"></i>
+            <h2 class="text-xl font-medium text-gray-300">Syncing latest links...</h2>
+        </div>
+
+        <div id="content-container"></div>
+    </main>
+
+    <!-- Scroll to Top (Dark/Fiery Theme) -->
+    <button id="scrollToTopBtn" class="fixed bottom-6 right-6 bg-zinc-800 border border-zinc-700 text-white rounded-full w-14 h-14 shadow-2xl hover:bg-gradient-to-r hover:from-orange-600 hover:to-red-600 hover:border-transparent transition-all transform scale-0 duration-300 z-50 flex items-center justify-center focus:outline-none">
+        <i class="fas fa-arrow-up text-xl"></i>
+    </button>
+
+    <script>
+        const SHEET_ID = '1RsySMkNRZjJfBe1lMPtzfO2Ao7Be96z6hl8XMzD_VdY';
+        const GID = '0';
+        const CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&gid=${GID}`;
+
+        let globalEpisodes = [];
+
+        async function initApp() {
+            try {
+                const response = await fetch(CSV_URL);
+                if (!response.ok) throw new Error("Network response was not ok");
+                
+                const csvText = await response.text();
+                
+                Papa.parse(csvText, {
+                    header: false,
+                    skipEmptyLines: true,
+                    complete: function(results) {
+                        processData(results.data);
+                    }
+                });
+            } catch (error) {
+                console.error("Fetch Error:", error);
+                document.getElementById('loading').innerHTML = `
+                    <div class="bg-red-900/30 text-red-400 p-6 rounded-xl border border-red-800/50 inline-block backdrop-blur-sm">
+                        <i class="fas fa-exclamation-triangle text-3xl mb-3"></i>
+                        <h3 class="text-lg font-bold text-red-300">Failed to load links</h3>
+                        <p class="text-sm">Please check your connection or spreadsheet permissions.</p>
+                    </div>`;
+            }
+        }
+
+        function processData(data) {
+            let episodesMap = new Map();
+            let currentEpisodeName = "Archived Links";
+
+            data.forEach((row) => {
+                if (!row || row.length === 0) return;
+
+                let colA = (row[0] || '').toString().trim(); 
+                let colB = (row[1] || '').toString().trim(); 
+                let colC = (row[2] || '').toString().trim(); 
+
+                if (!colA && !colB && !colC) return; 
+
+                if (colA.toLowerCase().includes('hotmakes') && colA.toLowerCase().includes('link dump')) {
+                    currentEpisodeName = colA;
+                } else {
+                    if (!episodesMap.has(currentEpisodeName)) {
+                        episodesMap.set(currentEpisodeName, []);
+                    }
+
+                    let actualLink = colC;
+                    if (!actualLink && colB.includes('http')) {
+                        const match = colB.match(/https?:\/\/[^\s]+/);
+                        if (match) actualLink = match[0];
+                    }
+
+                    if (colA || colB || actualLink) {
+                        episodesMap.get(currentEpisodeName).push({
+                            maker: colA,
+                            description: colB,
+                            link: actualLink,
+                            rawSearchString: `${colA} ${colB} ${actualLink}`.toLowerCase()
+                        });
+                    }
+                }
+            });
+
+            let episodesArray = Array.from(episodesMap, ([name, items]) => ({ name, items }));
+
+            episodesArray.sort((a, b) => {
+                const numA = parseInt((a.name.match(/\d+/) || [0])[0], 10);
+                const numB = parseInt((b.name.match(/\d+/) || [0])[0], 10);
+                
+                if (numA !== numB && !isNaN(numA) && !isNaN(numB)) {
+                    return numB - numA; 
+                }
+                return b.name.localeCompare(a.name);
+            });
+
+            globalEpisodes = episodesArray;
+            document.getElementById('loading').style.display = 'none';
+            renderLinks(globalEpisodes, "");
+        }
+
+        function renderLinks(episodesArray, searchTerm) {
+            const container = document.getElementById('content-container');
+            container.innerHTML = '';
+            
+            let hasAnyResults = false;
+
+            episodesArray.forEach(ep => {
+                const filteredItems = ep.items.filter(item => 
+                    !searchTerm || item.rawSearchString.includes(searchTerm)
+                );
+
+                if (filteredItems.length === 0) return; 
+                
+                hasAnyResults = true;
+
+                const section = document.createElement('div');
+                section.className = 'mb-12 fade-in';
+                
+                const header = document.createElement('h2');
+                header.className = 'text-2xl md:text-3xl font-extrabold text-white mb-5 pb-3 border-b-4 border-orange-500 inline-block pr-8 rounded-sm tracking-wide';
+                header.innerText = ep.name;
+                section.appendChild(header);
+
+                const list = document.createElement('ul');
+                list.className = 'bg-zinc-900 rounded-2xl shadow-xl border border-zinc-800 divide-y divide-zinc-800 overflow-hidden';
+                
+                filteredItems.forEach(item => {
+                    const li = document.createElement('li');
+                    li.className = 'p-5 sm:p-6 hover:bg-zinc-800/60 transition-colors duration-200 group flex flex-col sm:flex-row sm:items-start gap-4';
+                    
+                    let contentHtml = '<div class="flex-1 min-w-0">';
+                    
+                    if (item.maker) {
+                        contentHtml += `<h3 class="text-lg font-bold text-orange-400 mb-1 tracking-wide">${item.maker}</h3>`;
+                    }
+
+                    if (item.description) {
+                        let desc = item.description;
+                        desc = desc.replace(/(#\w+)/g, '<span class="text-red-400 font-medium">$1</span>');
+                        contentHtml += `<p class="text-gray-300 text-sm mb-3 leading-relaxed">${desc}</p>`;
+                    }
+                    
+                    if (item.link) {
+                        const href = item.link.startsWith('http') ? item.link : `https://${item.link}`;
+                        contentHtml += `
+                            <a href="${href}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center text-sm font-medium text-zinc-400 hover:text-orange-400 break-all transition-colors mt-1">
+                                <i class="fas fa-link mr-2 text-zinc-600 group-hover:text-orange-500 transition-colors"></i> 
+                                <span class="truncate max-w-xs md:max-w-md">${item.link}</span>
+                            </a>`;
+                    }
+                    
+                    contentHtml += '</div>';
+                    
+                    if (item.link) {
+                        const href = item.link.startsWith('http') ? item.link : `https://${item.link}`;
+                        contentHtml += `
+                            <a href="${href}" target="_blank" rel="noopener noreferrer" class="hidden sm:flex flex-shrink-0 items-center justify-center w-10 h-10 rounded-full bg-zinc-950 text-zinc-500 group-hover:bg-gradient-to-br group-hover:from-orange-500 group-hover:to-red-500 group-hover:text-white border border-zinc-800 group-hover:border-transparent transition-all ml-4 shadow-sm group-hover:shadow-orange-500/20">
+                                <i class="fas fa-chevron-right"></i>
+                            </a>`;
+                    }
+
+                    li.innerHTML = contentHtml;
+                    list.appendChild(li);
+                });
+
+                section.appendChild(list);
+                container.appendChild(section);
+            });
+
+            if (!hasAnyResults) {
+                container.innerHTML = `
+                    <div class="text-center py-16 bg-zinc-900 rounded-2xl shadow-lg border border-zinc-800">
+                        <i class="fas fa-search text-5xl text-zinc-700 mb-4 block"></i>
+                        <h3 class="text-2xl font-bold text-zinc-300 mb-2">No links found</h3>
+                        <p class="text-zinc-500">Try adjusting your search terms.</p>
+                    </div>`;
+            }
+        }
+
+        document.getElementById('searchInput').addEventListener('input', (e) => {
+            const term = e.target.value.toLowerCase().trim();
+            renderLinks(globalEpisodes, term);
+        });
+
+        const scrollBtn = document.getElementById('scrollToTopBtn');
+        window.addEventListener('scroll', () => {
+            if (window.scrollY > 400) {
+                scrollBtn.classList.remove('scale-0');
+                scrollBtn.classList.add('scale-100');
+            } else {
+                scrollBtn.classList.remove('scale-100');
+                scrollBtn.classList.add('scale-0');
+            }
+        });
+        scrollBtn.addEventListener('click', () => {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+
+        window.onload = initApp;
+    </script>
+</body>
+</html>
+
+
+
